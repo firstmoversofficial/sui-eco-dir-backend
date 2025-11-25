@@ -1,5 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
-import s3Service, { FileUploadOptions } from '../services/s3Service.js';
+import supabaseStorageService, {
+  FileUploadOptions,
+} from '../services/supabaseStorageService.js';
 import { createError } from '../middleware/errorHandler.js';
 
 export class UploadController {
@@ -44,7 +46,7 @@ export class UploadController {
         uploadOptions.maxSize = 8 * 1024 * 1024; // 8MB for project images
       } else if (type === 'project-video') {
         uploadOptions.folder = 'project-videos';
-        uploadOptions.maxSize = 100 * 1024 * 1024; // 100MB for videos
+        uploadOptions.maxSize = 50 * 1024 * 1024; // 50MB for videos
         uploadOptions.allowedTypes = [
           'video/mp4',
           'video/webm',
@@ -52,9 +54,12 @@ export class UploadController {
         ];
       }
 
-      console.log('Starting S3 upload...');
-      const result = await s3Service.uploadFile(req.file, uploadOptions);
-      console.log('S3 upload completed successfully');
+      console.log('Starting Supabase Storage upload...');
+      const result = await supabaseStorageService.uploadFile(
+        req.file,
+        uploadOptions
+      );
+      console.log('Supabase Storage upload completed successfully');
 
       res.status(200).json({
         success: true,
@@ -99,7 +104,7 @@ export class UploadController {
       }
 
       const uploadPromises = files.map(file =>
-        s3Service.uploadFile(file, uploadOptions)
+        supabaseStorageService.uploadFile(file, uploadOptions)
       );
 
       const results = await Promise.all(uploadPromises);
@@ -131,7 +136,7 @@ export class UploadController {
         throw createError(400, 'File key is required');
       }
 
-      await s3Service.deleteFile(key);
+      await supabaseStorageService.deleteFile(key);
 
       res.status(200).json({
         success: true,
@@ -150,7 +155,7 @@ export class UploadController {
         throw createError(400, 'File key is required');
       }
 
-      const metadata = await s3Service.getFileMetadata(key);
+      const metadata = await supabaseStorageService.getFileMetadata(key);
 
       res.status(200).json({
         success: true,
@@ -180,7 +185,10 @@ export class UploadController {
       const fileExtension = filename.split('.').pop();
       const key = `${folder || 'uploads'}/${timestamp}-${randomString}.${fileExtension}`;
 
-      const signedUrl = await s3Service.getSignedUploadUrl(key, contentType);
+      const signedUrl = await supabaseStorageService.getSignedUploadUrl(
+        key,
+        contentType
+      );
 
       res.status(200).json({
         success: true,
@@ -203,7 +211,7 @@ export class UploadController {
         throw createError(400, 'Project name is required');
       }
 
-      await s3Service.createProjectFolders(projectName);
+      await supabaseStorageService.createProjectFolders(projectName);
 
       res.status(200).json({
         success: true,
@@ -233,7 +241,7 @@ export class UploadController {
         throw createError(400, 'Project name is required');
       }
 
-      const files = await s3Service.listProjectFiles(
+      const files = await supabaseStorageService.listProjectFiles(
         projectName,
         folder as string
       );
@@ -248,7 +256,7 @@ export class UploadController {
             key: file.Key,
             size: file.Size,
             lastModified: file.LastModified,
-            url: `https://${process.env.AWS_S3_BUCKET_NAME}.s3.amazonaws.com/${file.Key}`,
+            url: supabaseStorageService.getPublicUrl(file.Key),
           })),
         },
       });
@@ -269,7 +277,7 @@ export class UploadController {
         throw createError(400, 'Playback ID is required');
       }
 
-      await s3Service.createVideoFolder(projectName, playbackId);
+      await supabaseStorageService.createVideoFolder(projectName, playbackId);
 
       res.status(200).json({
         success: true,
@@ -288,7 +296,7 @@ export class UploadController {
   async healthCheck(req: Request, res: Response, next: NextFunction) {
     try {
       const testKey = 'health-check/test.txt';
-      const exists = await s3Service.fileExists(testKey);
+      const exists = await supabaseStorageService.fileExists(testKey);
 
       res.status(200).json({
         success: true,
