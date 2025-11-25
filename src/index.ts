@@ -14,9 +14,13 @@ import { healthRoutes } from './routes/healthRoutes.js';
 import { authRoutes } from './routes/authRoutes.js';
 import { adminRoutes } from './routes/adminRoutes.js';
 import { uploadRoutes } from './routes/uploadRoutes.js';
+import supabaseStorageService from './services/supabaseStorageService.js';
 
 // Load environment variables
 dotenv.config();
+
+// Initialize Supabase Storage bucket
+supabaseStorageService.initializeBucket().catch(console.error);
 
 const app: express.Application = express();
 const PORT = process.env.PORT || 3001;
